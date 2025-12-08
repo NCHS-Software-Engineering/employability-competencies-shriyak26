@@ -38,6 +38,7 @@ export default function DailyThought() {
     const [thoughts, setThoughts] = useState<Thought[]>([]);
     const [competencies, setCompetencies] = useState<Competency[]>([]);
     const [selected, setSelected] = useState<number[]>([]);
+
     
     // Load competencies from API
     // useEffect is a React hook that runs after a component renders

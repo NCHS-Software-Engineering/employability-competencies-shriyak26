@@ -26,6 +26,12 @@ type EntryFromDB = {
 export default function Thoughts() {
     const [thoughts, setThoughts] = useState<Thought[]>([]);
     const [competencies, setCompetencies] = useState<Competency[]>([]);
+    const [deletedThoughts,deleteThoughts] = useState<Thought[]>([]);
+    const [editedThoughts,editThoughts] = useState<Thought[]>([]);
+
+
+    //const [thoughts, deleteThoughts] = useState<Thought[]>([]);
+
     
     // Load thoughts from the database using our GET route
     useEffect(() => {
@@ -50,6 +56,10 @@ export default function Thoughts() {
                 }
             ));
             setThoughts(formatted);
+
+           // deleteThoughts(formatted);
+
+
         }
         loadThoughts();
     }, []);
@@ -74,6 +84,22 @@ export default function Thoughts() {
                                 className="bg-white/20 p-3 rounded-lg shadow-sm">
                                 <p className="text-lg">{thought.text}</p>
                                 <p className="text-sm opacity-80 mt-1">{thought.time}</p>
+
+                                <button
+                                        onClick={() => deleteThoughts(thoughts)}
+                                                        className="bg-white text-[#ff0000] px-3 py-1 rounded-md font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+                                                    >
+                                                        Delete
+                                                    </button>
+
+
+                                 <button
+                                        onClick={() => editThoughts(thoughts)}
+                                                        className="bg-white text-[#ff0000] px-3 py-1 rounded-md font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+                                                    >
+                                                        Edit
+                                                    </button>
+
                                 {thought.competencies.length > 0 && (
                                 <p className="text-sm mt-1">
                                     <strong>Competencies: </strong>
