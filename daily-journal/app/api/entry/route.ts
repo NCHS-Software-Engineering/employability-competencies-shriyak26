@@ -5,16 +5,16 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import connection from "@/app/lib/db";
 
 // This function runs whenever a POST request is made to /api/entry
-export async function POST(req: Request) {
+export async function POST(req) {
     try {
         // Get the session information and check that the session is valid with a user email
         const session = await getServerSession(authOptions);
         if (!session || !session.user?.email) {
-            return NextResponse.json({error: "Not Authenticated"}, {status: 401})
+            return NextResponse.json({error: "Not Authenticated"}, {status: 401});
         }
 
         /* 
-        Get the text and competency IDs of the request body
+        Get the text and competency IDs from the request body
         We expect a JSON object that looks like this:
             {
                 "text": "My thought here",
@@ -56,8 +56,8 @@ export async function POST(req: Request) {
         // Use a for loop to insert each competency ID into this table along with the new entry ID
         for (const compID of competencyIDs) {
             await connection.execute(
-                "INSERT INTO EntryCompetency (entryID, competencyID) VALUES (?, ?)"
-            , [entryID, compID]
+                "INSERT INTO EntryCompetency (entryID, competencyID) VALUES (?, ?)",
+                [entryID, compID]
             );
         }
 
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     // console.error and console.log are not viewable on the client side
     catch (err) {
         console.error("Entry POST error: ", err);
-        return NextResponse.json({error: "Failed to add the entry."}, {status: 500})
+        return NextResponse.json({error: "Failed to add the entry."}, {status: 500});
     }
 }
 
@@ -111,4 +111,90 @@ export async function GET() {
     `
         , [userEmail]);
     return NextResponse.json(entries);
+}
+
+// This function runs whenever a DELETE request is made to /api/entry
+export async function DELETE(req) {
+    try {
+        // Get the session information and check that the session is valid with a user email
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user?.email) {
+            return NextResponse.json({error: "Not Authenticated"}, {status: 401});
+        }
+
+        // Extract the entry ID from the URL path (expects the URL to be in the format: /api/entry/{entryID})
+        const url = new URL(req.url);
+        const entryID = url.pathname.split('/').pop(); // Get the last part of the URL (entryID)
+
+        if (!entryID) {
+            return NextResponse.json({error: "Entry ID not provided"}, {status: 400});
+        }
+
+        // First, delete the related records from the EntryCompetency table
+        await connection.execute("DELETE FROM EntryCompetency WHERE entryID = ?", [entryID]);
+
+        // Now, delete the entry itself from the Entry table
+        const [result] = await connection.execute<ResultSetHeader>(
+            "DELETE FROM Entry WHERE id = ? AND user = ?",
+            [entryID, session.user.email]
+        );
+
+        if (result.affectedRows === 0) {
+            return NextResponse.json({error: "Entry not found or not authorized to delete"}, {status: 404});
+        }
+
+        return NextResponse.json({message: "Entry deleted successfully"});
+    } catch (err) {
+        console.error("Entry DELETE error: ", err);
+        return NextResponse.json({error: "Failed to delete the entry"}, {status: 500});
+    }
+}
+
+// This function runs whenever a PUT request is made to /api/entry
+// PUT is used to update an existing entry (edit)
+export async function PUT(req) {
+    try {
+        // Get the session information and check that the session is valid with a user email
+        const session = await getServerSession(authOptions);
+        if (!session || !session.user?.email) {
+            return NextResponse.json({error: "Not Authenticated"}, {status: 401});
+        }
+
+        // Extract the entry ID from the URL path (expects the URL to be in the format: /api/entry/{entryID})
+        const url = new URL(req.url);
+        const entryID = url.pathname.split('/').pop(); // Get the last part of the URL (entryID)
+
+        if (!entryID) {
+            return NextResponse.json({error: "Entry ID not provided"}, {status: 400});
+        }
+
+        // Get the updated text and competency IDs from the request body
+        const {text, competencyIDs} = await req.json();
+
+        // First, update the entry's text
+        const [updateResult] = await connection.execute<ResultSetHeader>(
+            "UPDATE Entry SET text = ? WHERE id = ? AND user = ?",
+            [text, entryID, session.user.email]
+        );
+
+        if (updateResult.affectedRows === 0) {
+            return NextResponse.json({error: "Entry not found or not authorized to edit"}, {status: 404});
+        }
+
+        // Remove the existing competencies related to the entry
+        await connection.execute("DELETE FROM EntryCompetency WHERE entryID = ?", [entryID]);
+
+        // Insert the new competencies (if any)
+        for (const compID of competencyIDs) {
+            await connection.execute(
+                "INSERT INTO EntryCompetency (entryID, competencyID) VALUES (?, ?)",
+                [entryID, compID]
+            );
+        }
+
+        return NextResponse.json({message: "Entry updated successfully"});
+    } catch (err) {
+        console.error("Entry PUT error: ", err);
+        return NextResponse.json({error: "Failed to update the entry"}, {status: 500});
+    }
 }
